@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simtypes"
-version = "0.0.13"
+version = "0.0.14"
 authors = [{ name = "Evgeniy Blinov", email = "zheni-b@yandex.ru" }]
 description = 'Type checking in runtime without stupid games'
 readme = "README.md"
