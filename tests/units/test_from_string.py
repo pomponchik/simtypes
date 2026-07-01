@@ -124,17 +124,17 @@ def test_get_float_value():
 
 def test_get_bool_value():
     """
-    Boolean deserialization accepts only the exact string tokens "yes", "True", "true", "False", "false", and "no".
+    Boolean deserialization returns True/False singletons only for the exact accepted string tokens.
 
     Empty, unknown, or near-match strings raise the boolean-specific TypeError.
     """
-    assert from_string('yes', bool) == True
-    assert from_string('True', bool) == True
-    assert from_string('true', bool) == True
+    assert from_string('yes', bool) is True
+    assert from_string('True', bool) is True
+    assert from_string('true', bool) is True
 
-    assert from_string('False', bool) == False
-    assert from_string('false', bool) == False
-    assert from_string('no', bool) == False
+    assert from_string('False', bool) is False
+    assert from_string('false', bool) is False
+    assert from_string('no', bool) is False
 
     with pytest.raises(TypeError, match=match('The string "kek" cannot be interpreted as a boolean value.')):
         from_string('kek', bool)

@@ -63,7 +63,7 @@ def test_built_in_types():
 
 
 def test_any():
-    """typing.Any matches all sampled values, including primitives, collections, None, and type objects."""
+    """typing.Any matches all sampled values, including primitives, collections, None, and type objects, even in strict mode."""
     assert check(True, Any)
     assert check(False, Any)
     assert check(0, Any)
@@ -76,6 +76,10 @@ def test_any():
     assert check(None, Any)
     assert check(str, Any)
     assert check(-1000, Any)
+    assert check([1, 'two', None], Any, strict=True)
+    assert check((1, 'two', None), Any, strict=True)
+    assert check(str, Any, strict=True)
+    assert check(None, Any, strict=True)
 
 
 @pytest.mark.skipif(sys.version_info > (3, 13), reason="Before Python 3.14, you couldn't just use Union as an annotation.")
@@ -190,6 +194,23 @@ def test_optional(tuple_type, list_type, make_optional):
     assert not check([], make_optional(tuple_type))
     assert check((), make_optional(tuple_type))
     assert check((1, 2, 3), make_optional(tuple_type))
+
+
+def test_optional_with_parameterized_collections_in_strict_mode(make_optional, subscribable_list_type, subscribable_tuple_type):
+    """
+    Strict Optional checks pass strict validation through to parameterized collections.
+
+    None still matches, but present list and tuple values must satisfy their inner annotations.
+    """
+    assert check(None, make_optional(subscribable_list_type[int]), strict=True)
+    assert check([1, 2, 3], make_optional(subscribable_list_type[int]), strict=True)
+    assert not check(['1', '2', '3'], make_optional(subscribable_list_type[int]), strict=True)
+    assert not check((1, 2, 3), make_optional(subscribable_list_type[int]), strict=True)
+
+    assert check(None, make_optional(subscribable_tuple_type[int, str]), strict=True)
+    assert check((1, 'kek'), make_optional(subscribable_tuple_type[int, str]), strict=True)
+    assert not check((1, 2), make_optional(subscribable_tuple_type[int, str]), strict=True)
+    assert not check([1, 'kek'], make_optional(subscribable_tuple_type[int, str]), strict=True)
 
 
 def test_optional_union(make_union, make_optional, tuple_type):
@@ -342,12 +363,15 @@ def test_dict_without_arguments(dict_type, addictional_parameters):
 
 
 def test_content_of_list_not_in_strict_mode_is_not_checking(subscribable_list_type):
-    """Non-strict List[int]/list[int] checks accept any list regardless of element contents."""
+    """Non-strict List[int]/list[int] checks accept any list regardless of element contents, but still reject non-lists."""
     assert check([], subscribable_list_type[int])
     assert check(['lol', 'kek'], subscribable_list_type[int])
     assert check([1.0, 2.0], subscribable_list_type[int])
     assert check([None, None], subscribable_list_type[int])
     assert check([None, 'kek', 1, 1.0], subscribable_list_type[int])
+    assert not check((), subscribable_list_type[int])
+    assert not check((1, 2, 3), subscribable_list_type[int])
+    assert not check('kek', subscribable_list_type[int])
 
 
 def test_content_of_tuple_not_in_strict_mode_is_not_checking(subscribable_tuple_type):
@@ -360,23 +384,29 @@ def test_content_of_tuple_not_in_strict_mode_is_not_checking(subscribable_tuple_
 
 
 def test_content_of_dict_not_in_strict_mode_is_not_checking(subscribable_dict_type):
-    """Non-strict Dict[int, int]/dict[int, int] validation accepts any dict regardless of key and value types."""
+    """Non-strict Dict[int, int]/dict[int, int] validation accepts any dict regardless of contents, but still rejects non-dicts."""
     assert check({}, subscribable_dict_type[int, int])
     assert check({1: 'kek'}, subscribable_dict_type[int, int])
     assert check({'lol': 'kek'}, subscribable_dict_type[int, int])
     assert check({'lol': 1}, subscribable_dict_type[int, int])
     assert check({1.0: 1}, subscribable_dict_type[int, int])
+    assert not check([], subscribable_dict_type[int, int])
+    assert not check([(1, 2)], subscribable_dict_type[int, int])
+    assert not check('{1: 1}', subscribable_dict_type[int, int])
 
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason='Subscribing to objects became available in Python 3.9')
 def test_content_of_set_not_in_strict_mode_is_not_checking():
-    """Non-strict set[int] validation checks only the set origin and ignores element types."""
+    """Non-strict set[int] validation accepts any set regardless of element contents, but still rejects non-sets."""
     assert check(set(), set[int])
     assert check(set(['lol', 'kek']), set[int])
     assert check(set([1, 'kek']), set[int])
     assert check(set([1, None]), set[int])
     assert check(set([None, None]), set[int])
     assert check(set(['1', '2']), set[int])
+    assert not check([], set[int])
+    assert not check(('1', '2'), set[int])
+    assert not check('kek', set[int])
 
 
 def test_try_to_pass_not_type_object_as_type():
@@ -415,9 +445,10 @@ def test_sequence():
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason='Subscribing to objects became available in Python 3.9')
 def test_sequence_is_not_checking_content():
-    """Sequence[str] checks only the sequence origin, so integer lists and tuples still pass."""
+    """Sequence[str] checks only the sequence origin, so integer lists and tuples pass while non-sequence containers fail."""
     assert check((1, 2, 3), Sequence[str])
     assert check([1, 2, 3], Sequence[str])
+    assert not check({1, 2, 3}, Sequence[str])
 
 
 def test_list_with_values_in_strict_mode(subscribable_list_type, make_union):
@@ -569,6 +600,8 @@ def test_pass_mocks_when_its_off(strict_mode, list_type):
     assert not check(MagicMock(), list_type, strict=strict_mode, pass_mocks=False)
 
     assert check(Mock(), Mock, strict=strict_mode, pass_mocks=False)
+    assert check(MagicMock(), Mock, strict=strict_mode, pass_mocks=False)
+    assert not check(Mock(), MagicMock, strict=strict_mode, pass_mocks=False)
     assert check(MagicMock(), MagicMock, strict=strict_mode, pass_mocks=False)
 
 
