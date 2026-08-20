@@ -2,13 +2,29 @@ from collections.abc import Hashable
 from datetime import date, datetime
 from inspect import isclass
 from json import JSONDecodeError, loads
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    get_args,
+    get_origin,
+    overload,
+)
 
 from simtypes import check
 from simtypes.typing import ExpectedType
 
 
 def convert_single_value(value: str, expected_type: Type[ExpectedType]) -> ExpectedType:  # noqa: PLR0912, PLR0911, C901
+    if expected_type is type(None):
+        if value in ('null', 'None'):
+            return None
+        raise TypeError(f'The string "{value}" cannot be interpreted as None.')
+
     if expected_type is str:
         return value  # type: ignore[return-value]
 
@@ -196,9 +212,22 @@ def fix_iterable_types(collection: Union[List[Any], Tuple[Any, ...], Dict[Hashab
     return result
 
 
+@overload
+def from_string(value: str, expected_type: None) -> None:
+    ...  # pragma: no cover
+
+
+@overload
 def from_string(value: str, expected_type: Type[ExpectedType]) -> ExpectedType:
+    ...  # pragma: no cover
+
+
+def from_string(value: str, expected_type: Optional[Type[ExpectedType]]) -> Optional[ExpectedType]:
     if not isinstance(value, str):
         raise ValueError(f'You can only pass a string as a string. You passed {type(value).__name__}.')
+
+    if expected_type is None:
+        return convert_single_value(value, type(None))
 
     if expected_type is Any:  # type: ignore[comparison-overlap]
         return value  # type: ignore[return-value]
