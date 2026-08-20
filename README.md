@@ -182,6 +182,7 @@ print(check(InnerNoneType('key'), InnerNoneType('key')))
 The library also provides basic deserialization. Conversion of strings into several basic types in various combinations is supported:
 
 - `str` - any string can be interpreted as a `str` type.
+- `None` or `type(None)` - the strings `"null"` and `"None"` are interpreted as `None`.
 - `int` - any integers.
 - `float` - any floating-point numbers, including infinities and [`NaN`](https://en.wikipedia.org/wiki/NaN).
 - `bool` - the strings `"yes"`, `"True"`, and `"true"` are interpreted as `True`, while `"no"`, `"False"`, or `"false"` are interpreted as `False`.
@@ -222,6 +223,12 @@ print(from_string('I am the danger', str))
 #> "I am the danger"
 print(from_string('I am the danger', Any))  # Any is interpreted as a string.
 #> "I am the danger"
+
+# None
+print(from_string('null', None))
+#> None
+print(from_string('None', type(None)))
+#> None
 
 # bools
 print(from_string('yes', bool))
