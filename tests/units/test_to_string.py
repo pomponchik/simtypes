@@ -784,10 +784,10 @@ def test_datetime_round_trip_preserves_fields_and_offset_but_loses_tzinfo_identi
 
 
 @pytest.mark.parametrize('offset_microseconds', [1, 999_999, -1, -999_999])
-def test_datetime_subsecond_offset_serializes_exactly_but_does_not_round_trip(
+def test_datetime_subsecond_offset_serializes_exactly_and_matches_fromisoformat(
     offset_microseconds: int,
 ):
-    """Serialize nonzero subsecond UTC offsets exactly; from_string preserves wall time but sets the offset to zero."""
+    """Serialize subsecond UTC offsets exactly and follow the runtime's fromisoformat behavior."""
     value = datetime(
         2026,
         1,
@@ -800,11 +800,14 @@ def test_datetime_subsecond_offset_serializes_exactly_but_does_not_round_trip(
 
     serialized = to_string(value)
     restored = from_string(serialized, datetime)
+    restored_by_runtime = datetime.fromisoformat(serialized)
 
     assert serialized == value.isoformat()
+    assert type(restored) is datetime
     assert restored.replace(tzinfo=None) == value.replace(tzinfo=None)
     assert value.utcoffset() == timedelta(microseconds=offset_microseconds)
-    assert restored.utcoffset() == timedelta(0)
+    assert restored.utcoffset() == restored_by_runtime.utcoffset()
+    assert restored.utcoffset() in (value.utcoffset(), timedelta(0))
 
 
 @pytest.mark.parametrize(
