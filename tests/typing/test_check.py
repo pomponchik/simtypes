@@ -4,14 +4,14 @@ from simtypes import check
 
 
 @pytest.mark.mypy_testing
-def test_basic_positives() -> None:
+def test_basic_positives():
     """Static typing accepts simple matching int and str check calls, and the runtime results are true."""
     assert check(5, int)
     assert check("kek", str)
 
 
 @pytest.mark.mypy_testing
-def test_positive_with_users_class() -> None:
+def test_positive_with_users_class():
     """Static typing accepts a locally defined class hint, and the runtime check is true for its instance."""
     class SomeClass:
         pass
@@ -20,7 +20,7 @@ def test_positive_with_users_class() -> None:
 
 
 @pytest.mark.mypy_testing
-def test_negative_with_users_class() -> None:
+def test_negative_with_users_class():
     """
     A non-instance value can be passed with a local class hint without a static typing error.
 

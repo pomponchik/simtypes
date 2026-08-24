@@ -1,5 +1,6 @@
 __pycache__
 .pytest_cache
+.hypothesis
 .DS_Store
 test.py
 *.egg-info
@@ -17,3 +18,4 @@ uv.lock
 .ropeproject
 node_modules
 mutants
+AGENTS.md

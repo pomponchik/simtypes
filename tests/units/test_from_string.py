@@ -9,13 +9,11 @@ from full_match import match
 from simtypes import from_string
 
 
-def test_value_is_not_string():
+@pytest.mark.parametrize('expected_type', [int, str, None, type(None)])
+def test_value_is_not_string(expected_type):
     """Reject non-string input with ValueError before deserialization, for both parsed and passthrough target types."""
     with pytest.raises(ValueError, match=match('You can only pass a string as a string. You passed int.')):
-        from_string(5, int)
-
-    with pytest.raises(ValueError, match=match('You can only pass a string as a string. You passed int.')):
-        from_string(5, str)
+        from_string(5, expected_type)
 
 
 def test_type_is_not_type():
@@ -36,10 +34,25 @@ def test_not_supported_data_type():
         from_string('kek', SuperType)
 
 
-def test_get_string_value():
+@pytest.mark.parametrize('string', ['kek', 'lol', 'null', 'None'])
+def test_get_string_value(string):
     """Explicit str deserialization returns valid string input unchanged."""
-    assert from_string('kek', str) == 'kek'
-    assert from_string('lol', str) == 'lol'
+    assert from_string(string, str) == string
+
+
+@pytest.mark.parametrize('expected_type', [None, type(None)])
+@pytest.mark.parametrize('string', ['null', 'None'])
+def test_get_none_value(string, expected_type):
+    """The exact tokens "null" and "None" deserialize to the None singleton for None and type(None) targets."""
+    assert from_string(string, expected_type) is None
+
+
+@pytest.mark.parametrize('expected_type', [None, type(None)])
+@pytest.mark.parametrize('string', ['', 'none', 'NULL', 'nil', ' null', 'null ', ' None', 'None ', ' null ', ' None '])
+def test_reject_invalid_none_value(string, expected_type):
+    """None and type(None) targets reject empty, case-variant, unrelated, and whitespace-padded tokens with the exact TypeError message containing the original input."""
+    with pytest.raises(TypeError, match=match(f'The string "{string}" cannot be interpreted as None.')):
+        from_string(string, expected_type)
 
 
 def test_get_int_value():
@@ -159,6 +172,7 @@ def test_get_list_value(list_type, subscribable_dict_type, subscribable_list_typ
 
     assert from_string('[1, 2, 3]', subscribable_list_type[int]) == [1, 2, 3]
     assert from_string('["lol", "kek"]', subscribable_list_type[str]) == ["lol", "kek"]
+    assert from_string('[null]', subscribable_list_type[None]) == [None]
 
     assert from_string('[["lol", "kek"], ["lol", "kek"]]', subscribable_list_type[subscribable_list_type[str]]) == [["lol", "kek"], ["lol", "kek"]]
     assert from_string('[{"lol": "kek"}, {"lol": "kek"}]', subscribable_list_type[subscribable_dict_type[str, str]]) == [{'lol': 'kek'}, {'lol': 'kek'}]
@@ -177,6 +191,9 @@ def test_get_list_value(list_type, subscribable_dict_type, subscribable_list_typ
 
     with pytest.raises(TypeError, match=match('The string "[1, 2, "3"]" cannot be interpreted as a list of the specified format.')):
         from_string('[1, 2, "3"]', subscribable_list_type[str])
+
+    with pytest.raises(TypeError, match=match('The string "["None"]" cannot be interpreted as a list of the specified format.')):
+        from_string('["None"]', subscribable_list_type[None])
 
     with pytest.raises(TypeError, match=match('The string "[1, 2, "3"" cannot be interpreted as a list of the specified format.')):
         from_string('[1, 2, "3"', subscribable_list_type[str])
@@ -212,6 +229,8 @@ def test_get_tuple_value(tuple_type, subscribable_tuple_type, subscribable_dict_
     assert from_string('["lol", "kek"]', subscribable_tuple_type[str, ...]) == ("lol", "kek")
     assert from_string('[1, 2, 3]', subscribable_tuple_type[int, int, int]) == (1, 2, 3)
     assert from_string('["lol", "kek"]', subscribable_tuple_type[str, str]) == ("lol", "kek")
+    assert from_string('[null]', subscribable_tuple_type[None]) == (None,)
+    assert from_string('[null, null]', subscribable_tuple_type[None, ...]) == (None, None)
 
     assert from_string('[["lol", "kek"], ["lol", "kek"]]', subscribable_tuple_type[subscribable_tuple_type[str, str], subscribable_tuple_type[str, str]]) == (("lol", "kek"), ("lol", "kek"))
     assert from_string('[{"lol": "kek"}, {"lol": "kek"}]', subscribable_tuple_type[subscribable_dict_type[str, str], subscribable_dict_type[str, str]]) == ({'lol': 'kek'}, {'lol': 'kek'})
@@ -239,6 +258,12 @@ def test_get_tuple_value(tuple_type, subscribable_tuple_type, subscribable_dict_
 
     with pytest.raises(TypeError, match=match('The string "[1, 2, "3"]" cannot be interpreted as a tuple of the specified format.')):
         from_string('[1, 2, "3"]', subscribable_tuple_type[str])
+
+    with pytest.raises(TypeError, match=match('The string "["None"]" cannot be interpreted as a tuple of the specified format.')):
+        from_string('["None"]', subscribable_tuple_type[None])
+
+    with pytest.raises(TypeError, match=match('The string "["None"]" cannot be interpreted as a tuple of the specified format.')):
+        from_string('["None"]', subscribable_tuple_type[None, ...])
 
     with pytest.raises(TypeError, match=match('The string "[1, 2, "3"" cannot be interpreted as a tuple of the specified format.')):
         from_string('[1, 2, "3"', subscribable_tuple_type[str])
@@ -275,6 +300,7 @@ def test_get_dict_value(dict_type, subscribable_list_type, subscribable_dict_typ
     assert from_string('{"1": 1, "2": 2, "3": 3}', subscribable_dict_type[str, int]) == {"1": 1, "2": 2, "3": 3}
     assert from_string('{"lol": "kek"}', subscribable_dict_type[str, str]) == {"lol": "kek"}
     assert from_string('{"lol": 1, "kek": 2}', subscribable_dict_type[str, int]) == {"lol": 1, "kek": 2}
+    assert from_string('{"none": null}', subscribable_dict_type[str, None]) == {'none': None}
 
     assert from_string('{"kek": ["lol", "kek"]}', subscribable_dict_type[str, subscribable_list_type[str]]) == {"kek": ["lol", "kek"]}
     assert from_string('{"123": [{"lol": "kek"}, {"lol": "kek"}]}', subscribable_dict_type[str, subscribable_list_type[subscribable_dict_type[str, str]]]) == {"123": [{"lol": "kek"}, {"lol": "kek"}]}
@@ -325,6 +351,9 @@ def test_get_dict_value(dict_type, subscribable_list_type, subscribable_dict_typ
     with pytest.raises(TypeError, match=match('The string "{"lol": "kek"}" cannot be interpreted as a dict of the specified format.')):
         from_string('{"lol": "kek"}', subscribable_dict_type[int, int])
 
+    with pytest.raises(TypeError, match=match('The string "{"none": "None"}" cannot be interpreted as a dict of the specified format.')):
+        from_string('{"none": "None"}', subscribable_dict_type[str, None])
+
     with pytest.raises(TypeError, match=match('The string "{"lol": ["kek"]}" cannot be interpreted as a dict of the specified format.')):
         from_string('{"lol": ["kek"]}', subscribable_dict_type[str, subscribable_list_type[int]])
 
@@ -338,6 +367,8 @@ def test_get_dict_value(dict_type, subscribable_list_type, subscribable_dict_typ
         '{"lol": "kek"}',
         '1',
         'kek',
+        'null',
+        'None',
     ],
 )
 def test_get_any(string):
