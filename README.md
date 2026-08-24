@@ -27,6 +27,7 @@ Python type checking tools are usually very complex. In this case, we have throw
 - [**Type checking**](#type-checking)
 - [**Special types**](#special-types)
 - [**String deserialization**](#string-deserialization)
+- [**String serialization**](#string-serialization)
 
 
 ## Why?
@@ -256,3 +257,98 @@ print(from_string('{"123": [1, 2, 3]}', dict[str, tuple[int, ...]]))
 ```
 
 > 👀 If the passed string cannot be interpreted as an object of the specified type, a `TypeError` exception will be raised.
+
+
+## String serialization
+
+The library also provides basic serialization. The `to_string` function is the reverse operation for `from_string`: it converts supported Python values into strings.
+
+The following exact types are supported:
+
+- `str` - strings are returned unchanged.
+- `NoneType` - `None` is converted to the string `"None"`.
+- `int` - integers use their standard Python string representation.
+- `float` - floating-point numbers use their standard Python string representation, including infinities, [`NaN`](https://en.wikipedia.org/wiki/NaN), and negative zero.
+- `bool` - boolean values are converted to `"True"` or `"False"`.
+- `date` or `datetime` - dates and datetimes are converted to [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) strings.
+- `list` - lists are converted to [`JSON`](https://en.wikipedia.org/wiki/JSON) arrays.
+- `tuple` - tuples are converted to [`JSON`](https://en.wikipedia.org/wiki/JSON) arrays.
+- `dict` - dictionaries with exact string keys are converted to [`JSON`](https://en.wikipedia.org/wiki/JSON) objects.
+
+Inside collections, `None` becomes `null`, boolean values use the JSON spelling, and `date` and `datetime` values become ISO-formatted JSON strings. Subclasses of supported types and all other types raise `TypeError`.
+
+The full function signature is:
+
+```python
+def to_string(value: Any, *, strict_json_dict: bool = True) -> str:
+    ...
+```
+
+Examples:
+
+```python
+from datetime import date, datetime
+from typing import Dict, List, Tuple
+
+from simtypes import NonRoundTrippableKeyError, from_string, to_string
+
+# scalars
+print(to_string('text'))
+#> text
+print(to_string(13))
+#> 13
+print(to_string(True))
+#> True
+print(to_string(None))
+#> None
+print(to_string(date(2026, 1, 22)))
+#> 2026-01-22
+print(to_string(datetime(2026, 1, 22, 3, 4, 5)))
+#> 2026-01-22T03:04:05
+
+# collections
+value = {
+    'items': (1, None),
+    'dates': [date(2026, 1, 22)],
+}
+
+print(to_string(value))
+#> {"items": [1, null], "dates": ["2026-01-22"]}
+
+# round-trip
+integer = 13
+print(from_string(to_string(integer), int))
+#> 13
+
+items = [(1, 2), (3, 4)]
+items_type = List[Tuple[int, ...]]
+print(from_string(to_string(items), items_type))
+#> [(1, 2), (3, 4)]
+
+temporal = {'dates': [date(2026, 1, 22)]}
+temporal_type = Dict[str, List[date]]
+print(from_string(to_string(temporal), temporal_type))
+#> {'dates': [datetime.date(2026, 1, 22)]}
+
+# dictionary keys
+try:
+    to_string({1: 'value'})
+except NonRoundTrippableKeyError as error:
+    print(error)
+#> Dictionary key 1 of type int cannot be serialized without changing its type. Pass strict_json_dict=False to allow lossy serialization.
+
+serialized = to_string({1: 'value'}, strict_json_dict=False)
+print(serialized)
+#> {"1": "value"}
+print(from_string(serialized, Dict[str, str]))
+#> {'1': 'value'}
+```
+
+For round-trip, retain the complete expected type, including generic arguments, and pass it to `from_string`. The serialized text contains no type information: the same JSON array can represent a Python list or tuple. A round-trip through `Any` preserves only values whose exact type is `str`, because `from_string(..., Any)` returns the serialized text unchanged.
+
+By default, dictionaries accept only exact string keys. Pass `strict_json_dict=False` to allow `int`, `float`, `bool`, and `None` keys. These keys are converted to JSON property names, so their original types are not preserved. Different Python keys may also produce duplicate JSON property names; the serialized text retains the duplicates, but `from_string` retains only the last value. Other key types, including `date` and `datetime`, raise `TypeError` in both modes.
+
+> 👀 There are two additional round-trip limitations:
+>
+> - `NaN` must be compared semantically because `NaN != NaN`. The sign of `-0.0` is preserved.
+> - Datetime serialization preserves calendar and time fields, microseconds, and UTC offsets that are zero or at least one second in magnitude. A nonzero subsecond offset becomes zero during deserialization without changing the wall time. ISO strings do not preserve `fold` or a `tzinfo` object's identity or custom name.
