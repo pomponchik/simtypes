@@ -9,7 +9,7 @@ except ImportError:  # pragma: no cover
 
 
 @pytest.mark.mypy_testing
-def test_none_deserialization_return_types() -> None:
+def test_none_deserialization_return_types():
     """
     assert_type checks exact return types: None for None and type(None), and int for int.
 
