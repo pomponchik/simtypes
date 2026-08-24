@@ -351,4 +351,4 @@ By default, dictionaries accept only exact string keys. Pass `strict_json_dict=F
 > 👀 There are two additional round-trip limitations:
 >
 > - `NaN` must be compared semantically because `NaN != NaN`. The sign of `-0.0` is preserved.
-> - Datetime serialization preserves calendar and time fields, microseconds, and UTC offsets that are zero or at least one second in magnitude. A nonzero subsecond offset becomes zero during deserialization without changing the wall time. ISO strings do not preserve `fold` or a `tzinfo` object's identity or custom name.
+> - Datetime serialization preserves calendar and time fields, microseconds, and the exact UTC offset. `from_string` follows `datetime.fromisoformat`: current CPython releases preserve subsecond offsets, while versions affected by [CPython issue 152079](https://github.com/python/cpython/issues/152079) normalize them to zero. ISO strings do not preserve `fold` or a `tzinfo` object's identity or custom name.
